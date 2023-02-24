@@ -49,6 +49,17 @@ def get_mail(soup):
         return ""
 
 
+def get_website(soup):
+    try:
+        website = soup.find("div", class_="office-sheet__url field--link").find("a")['href']
+        if website.startswith("http"):
+            return website
+        else:
+            return "https://" + website
+    except AttributeError:
+        return ""
+
+
 def get_address(soup):
     try:
         spans = soup.find("div", class_="office-sheet__address field--address").find("p", "address").findAll("span")
@@ -64,9 +75,10 @@ def format_notary(notary_array):
         if notary:
             notary_dict = {
                 'name': notary.get_name(),
+                'mail': notary.get_mail(),
                 'phone': notary.get_phone(),
-                'mail': notary.get_address(),
-                'web': notary.get_web(),
+                'website': notary.get_website(),
+                'address': notary.get_address()
             }
             notary_data.append(notary_dict)
 
@@ -77,25 +89,27 @@ async def main():
     async with aiohttp.ClientSession() as session:
         notaries = []
         for page in range(0, pageNb + 1):
-            finalUrl = baseUrl + uri + str(page)
-            soup = await swoup(session, finalUrl)
+            final_url = baseUrl + uri + str(page)
+            soup = await swoup(session, final_url)
             cards = soup.findAll("article", class_="notary-card notary-card--notary")
             endpoints = await get_endpoints(session, cards)
             for endpoint in endpoints:
                 nom = get_name(endpoint)
                 phone = get_phone(endpoint)
                 mail = get_mail(endpoint)
+                website = get_website(endpoint)
                 address = get_address(endpoint)
-                notary = Notary(nom, phone, mail, address)
+                notary = Notary(nom, phone, mail, website, address)
                 notaries.append(notary)
 
         formated_notary = format_notary(notaries)
         df = pd.DataFrame(formated_notary)
-        df.to_csv("glenAsync.csv", index=False)
+        df.to_csv("notaries.csv", index=False)
 
         print(f"Le nombre de notaires récupérés est : {len(notaries)}")
 
 start_time = time.time()
+asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 asyncio.run(main())
 end_time = time.time()
 
